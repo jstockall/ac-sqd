@@ -20,6 +20,14 @@ interface EarningResult {
 
     val isLqmEligible: Boolean
     val lqm: Int?
+
+    /**
+     * True when the earning rate had to be assumed rather than determined exactly,
+     * so the UI can flag the row.  Currently set when a carrier prices by fare brand
+     * but no brand was supplied.
+     */
+    val hasEstimatedEarning: Boolean
+        get() = false
 }
 
 class EarningResultAcTicketOrFlight(
@@ -31,6 +39,7 @@ class EarningResultAcTicketOrFlight(
     val eliteStatusBonusMultiplier: Int,
     override var eligibleDollars: Int? = null,
     override val isLqmEligible: Boolean,
+    override val hasEstimatedEarning: Boolean = false,
 ) : EarningResult {
     override val sqc
         get() = eligibleDollars?.let { eligibleDollars ->
@@ -102,6 +111,7 @@ class EarningResultAcTicketOrFlight(
 
 class EarningResultZero(
     override val distanceResult: DistanceResult,
+    override val hasEstimatedEarning: Boolean = false,
 ) : EarningResult {
     override val sqcMultiplier = 0
     override val eliteBonusMultiplier = 0
@@ -120,6 +130,7 @@ class EarningResultStarAllianceTicketAndFlight(
     override val distanceResult: DistanceResult,
     val distanceMultiplierPercent: Int,
     private val isAcElite: Boolean,
+    override val hasEstimatedEarning: Boolean = false,
 ) : EarningResult {
     // SQC is handled differently
     override val sqcMultiplier = 0
@@ -224,7 +235,7 @@ private abstract class StarAllianceEarningCalculator : EarningCalculator {
         }
 
         if (!forceAcCalculation && getDistancePercentMultiplier(args) == 0) {
-            return EarningResultZero(args.distanceResult)
+            return EarningResultZero(args.distanceResult, hasEstimatedEarning(args))
         }
 
         return if (args.ticketNumber.startsWith("014") || forceAcCalculation) {
@@ -238,6 +249,7 @@ private abstract class StarAllianceEarningCalculator : EarningCalculator {
                     eliteStatusBonusMultiplier = args.eliteBonusMultiplier,
                     eligibleDollars = args.eligibleDollars,
                     isLqmEligible = args.operatingAirline == "AC",
+                    hasEstimatedEarning = hasEstimatedEarning(args),
                 )
             }
         } else {
@@ -246,6 +258,7 @@ private abstract class StarAllianceEarningCalculator : EarningCalculator {
                     distanceResult = args.distanceResult,
                     distanceMultiplierPercent = percentMultiplier,
                     isAcElite = args.eliteBonusMultiplier > 0,
+                    hasEstimatedEarning = hasEstimatedEarning(args),
                 )
             }
         }
@@ -335,6 +348,9 @@ private abstract class StarAllianceEarningCalculator : EarningCalculator {
     abstract fun getDistancePercentMultiplier(args: CalculatorArgs): Int?
 
     open fun isEligibleForSqc(args: CalculatorArgs) = true
+
+    /** See [EarningResult.hasEstimatedEarning]. */
+    open fun hasEstimatedEarning(args: CalculatorArgs) = false
 
     final override fun isEligibleForElitePointsBonus(args: CalculatorArgs) =
         args.operatingAirline == "AC" || args.ticketNumber.startsWith("014")
@@ -979,13 +995,16 @@ private val tpCalculator = object : StarAllianceEarningCalculator() {
         // Without a brand, the booking class alone is ambiguous: TAP sells the same
         // class across several brands at different rates.  Assume the Economy
         // Plus/Classic rate, which covers most economy inventory; Comfort's 115% is
-        // only awarded when the brand confirms it.
+        // only awarded when the brand confirms it.  The result is flagged as
+        // estimated so the caller can say so.
         return when (args.fareClass) {
             "C", "D", "Z", "J" -> 150
             "Y", "B", "M", "S", "H", "Q", "V", "W", "A", "K", "L", "U", "E", "T", "O" -> 100
             else -> 0
         }
     }
+
+    override fun hasEstimatedEarning(args: CalculatorArgs) = getBrandPercentMultiplier(args) == null
 }
 
 private val uaCalculator = object : StarAllianceEarningCalculator() {

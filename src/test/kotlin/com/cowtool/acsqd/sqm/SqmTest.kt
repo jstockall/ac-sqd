@@ -1060,6 +1060,36 @@ internal class SqmTest {
     }
 
     @Test
+    fun `TP flags earning as estimated only when no brand was supplied`() {
+        assertEquals(true, tpResult("O", null).hasEstimatedEarning)
+        assertEquals(true, tpResult("O", "").hasEstimatedEarning)
+        assertEquals(true, tpResult("O", "RANDOM").hasEstimatedEarning)
+
+        assertEquals(false, tpResult("O", "PLUS").hasEstimatedEarning)
+        assertEquals(false, tpResult("O", "O15CLC0A").hasEstimatedEarning)
+        assertEquals(false, tpResult("V", "DISCOUNT").hasEstimatedEarning)
+        assertEquals(false, tpResult("C", "TOP EXECUTIVE").hasEstimatedEarning)
+    }
+
+    @Test
+    fun `other airlines never flag earning as estimated`() {
+        with(
+            getEarningResult(
+                operatingAirline = "UA",
+                marketingAirline = null,
+                origin = "LIS",
+                destination = "YYZ",
+                fareClass = "Y",
+                fareBasis = null,
+                ticketNumber = "047",
+                eliteBonusMultiplier = 0,
+            )!!,
+        ) {
+            assertEquals(false, hasEstimatedEarning)
+        }
+    }
+
+    @Test
     fun `TP earns nothing in classes absent from the table`() {
         assertEquals(0, tpResult("G", null).basePoints)
         assertEquals(0, tpResult("P", null).basePoints)

@@ -105,6 +105,7 @@ var SqcCalculator = window.SqcCalculator || {};
         $('#resultsContainer').show();
         $("#resultsTable > tbody").empty();
         $("#resultsTable > tfoot").empty();
+        $('#estimatedWarning').hide();
 
         itinerary.segments.forEach(segment => {
             $("#resultsTable").find('tbody')
@@ -118,7 +119,9 @@ var SqcCalculator = window.SqcCalculator || {};
                         .attr('align', 'center')
                     )
                     .append($('<td>')
-                        .text(segment.fareClass + ('fareBrand' in segment ? ' (' + segment.fareBrand + ')' : ''))
+                        .text(segment.fareClass
+                            + ('fareBrand' in segment ? ' (' + segment.fareBrand + ')' : '')
+                            + (segment.earningResult.hasEstimatedEarning ? ' *' : ''))
                         .attr('align', 'center')
                     )
                     .append($('<td>')
@@ -163,6 +166,10 @@ var SqcCalculator = window.SqcCalculator || {};
                     )
                 )
         });
+
+        if (itinerary.segments.some(segment => segment.earningResult.hasEstimatedEarning)) {
+            $('#estimatedWarning').show();
+        }
 
         const totalPoints = (itinerary.totalRow.totalPoints != null) ? itinerary.totalRow.totalPoints.toLocaleString('en-US') : '???';
         $("#resultsTable").find('tfoot')
